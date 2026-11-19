@@ -138,7 +138,7 @@ function lastWord(buf, from) {
   if (!(from > 0 && from < end - 0.1)) from = Math.max(0, end - 0.6);
   return { from, end };
 }
-let voiceLevel = 0.25; // level of the narration
+let voiceLevel = 0.2; // level of the narration
 const ECHO = 0.45;    // the first echo of the last word, relative to the word itself (quieter than it)
 let current = null;   // the gains of the line being spoken, so a level change applies at once
 /** Changes the narration level (used by the tuning page). */
@@ -157,7 +157,7 @@ export async function loadVoice(lang, ext, lines, lastWord = []) {
   lines.forEach((key, i) => { if (lastWord[i] !== undefined) starts[key] = lastWord[i]; });
   await Promise.all(lines.map(async (key, i) => {
     try {
-      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=19`);
+      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=20`);
       if (r.ok) raw[key] = await r.arrayBuffer();
     } catch (e) { /* no recording for this line */ }
   }));
