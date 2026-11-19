@@ -129,7 +129,7 @@ function lastWord(buf, from) {
   if (!(from > 0 && from < end - 0.1)) from = Math.max(0, end - 0.6);
   return { from, end };
 }
-let voiceLevel = 0.13; // level of the narration
+let voiceLevel = 0.15; // level of the narration
 const ECHO = 0.45;    // the first echo of the last word, relative to the word itself (quieter than it)
 let current = null;   // the gains of the line being spoken, so a level change applies at once
 /** Changes the narration level (used by the tuning page). */
