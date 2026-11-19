@@ -51,7 +51,7 @@ python3 -m http.server 8000
 ## Publishing changes
 
 Browsers keep the site's files for a few minutes, so the scripts, stylesheet
-and voice clips are loaded with a version tag (`?v=19`). After changing any of
+and voice clips are loaded with a version tag (`?v=20`). After changing any of
 them, raise that number everywhere it appears (search the project for `?v=`)
 so phones pick up the new files on the next reload.
 
