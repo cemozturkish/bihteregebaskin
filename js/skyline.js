@@ -1,7 +1,7 @@
 // The horizon as seen from the Galata Tower: a strip that wraps once around
 // the compass (x = azimuth 0…360°, y = altitude 0…9°). Bearings of the
 // landmarks are real; their heights are exaggerated so they read as silhouettes.
-import { SKYLINE_TOP_DEG } from './renderer.js?v=16';
+import { SKYLINE_TOP_DEG } from './renderer.js?v=17';
 
 const W = 4096, H = 256;
 const X = W / 360;              // px per degree of azimuth
