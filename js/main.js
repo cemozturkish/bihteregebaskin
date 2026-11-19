@@ -1,8 +1,8 @@
-import { CONFIG, T, LANG, VOICE_LINES } from './config.js';
-import { Renderer, MAX_METEOR_VERTS } from './renderer.js';
-import * as astro from './astro.js';
-import { paintSkyline } from './skyline.js';
-import * as audio from './audio.js';
+import { CONFIG, T, LANG, VOICE_LINES } from './config.js?v=12';
+import { Renderer, MAX_METEOR_VERTS } from './renderer.js?v=12';
+import * as astro from './astro.js?v=12';
+import { paintSkyline } from './skyline.js?v=12';
+import * as audio from './audio.js?v=12';
 
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
@@ -158,7 +158,7 @@ const meteorData = new Float32Array(MAX_METEOR_VERTS * 6);
 let lastChime = 0;
 
 function spawnMeteor(now, o = {}) {
-  if (meteors.length >= 60) return false;
+  if (meteors.length >= 130) return false;
   const up = [sky.R[2], sky.R[5], sky.R[8]];
   let P = o.through;
   if (!P) {
@@ -188,7 +188,8 @@ function spawnMeteor(now, o = {}) {
     train: 0.35 + bright * 0.9,
     tint: Math.random(),
   });
-  if (bright > 0.72 && now - lastChime > 900 && S.mode !== 'intro') {
+  // chime for bright ones, spaced out more while the storm is busy
+  if (bright > 0.72 && now - lastChime > (S.storm > 2 ? 1500 : 900) && S.mode !== 'intro') {
     lastChime = now;
     audio.chime(0.035 + bright * 0.035);
   }
@@ -537,7 +538,14 @@ function frame(now) {
   // meteors
   if (S.mode !== 'intro') {
     const rate = meteorRate();
-    if (Math.random() < (rate.leonids + S.storm) * dt) for (let k = 0; k < 5 && !spawnMeteor(now, { leonid: true }); k++);
+    // several can start in one frame, so a busy storm really pours
+    for (let i = Math.floor((rate.leonids + S.storm) * dt + Math.random()); i > 0; i--) {
+      // during the storm: brighter on average, and about one in five a long fireball
+      const o = !S.storm ? { leonid: true }
+        : Math.random() < 0.2 ? { leonid: true, bright: 0.65 + Math.random() * 0.35, long: true }
+        : { leonid: true, bright: 0.3 + 0.7 * Math.pow(Math.random(), 1.4) };
+      for (let k = 0; k < 5 && !spawnMeteor(now, o); k++);
+    }
     if (Math.random() < rate.sporadic * dt) spawnMeteor(now, {});
     if (S.party && Math.random() < S.party * dt) spawnMeteor(now, { bright: 0.35 + Math.random() * 0.6, long: Math.random() < 0.3 });
   }
@@ -771,6 +779,9 @@ function say(text, ms, cls = '', line = null) {
     voiceUntil = performance.now() + spoken + VOICE_GAP;
     ms = Math.max(ms, spoken + 300);
   }
+  // with a recording, the caption comes up half a second sooner and still leaves at the same moment
+  const had = !!el.caption.textContent;
+  const early = spoken && had ? 500 : 0;
   clearTimeout(captionTimer);
   el.caption.classList.remove('on');
   captionTimer = setTimeout(() => {
@@ -778,8 +789,8 @@ function say(text, ms, cls = '', line = null) {
     el.caption.textContent = text;
     void el.caption.offsetWidth;
     el.caption.classList.add('on');
-    captionTimer = setTimeout(() => el.caption.classList.remove('on'), ms);
-  }, el.caption.textContent ? 700 : 0);
+    captionTimer = setTimeout(() => el.caption.classList.remove('on'), ms + early);
+  }, had ? 700 - early : 0);
 }
 function hush() {
   clearTimeout(captionTimer);
@@ -910,9 +921,10 @@ async function story() {
   tween(S, { lines: 0 }, 2500);
   tween(S, { labels: 0 }, 2500);
   say(T.s_storm1, 4200, '', 's_storm1');
-  tween(S, { storm: 1.6 }, 6000);
+  tween(S, { storm: 6 }, 5000);
   await sleep(5400, t);
   say(T.s_storm2, 6600, '', 's_storm2');
+  tween(S, { storm: 16 }, 3500);
   await sleep(7600, t);
   if (bornInStorm) {
     S.flow = 0;
@@ -923,7 +935,7 @@ async function story() {
 
   // 3 ─ the day goes by
   S.flow = 0;
-  tween(S, { storm: 0 }, 1500);
+  tween(S, { storm: 0 }, 3000);
   const aim = eveningAim();
   say(T.s_sunrise, 5200, '', 's_sunrise');
   if (bornByDay) {
