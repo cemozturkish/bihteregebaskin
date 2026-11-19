@@ -47,13 +47,14 @@ if (/^(en|tr)\.\w+$/.test(q.get('voice') || '')) {
 }
 if (CONFIG.voice) CONFIG.lang = CONFIG.voice.lang;
 
-// The narrated lines, in the order they are numbered in voice/<lang>/.
 // Where the last word starts in each recording in voice/en/, in seconds into
-// the clip; the echo picks up from there. Measure again if the clips are re-cut.
+// the clip; the echo picks up from there (null: no echo, as on the closing
+// line). Measure again if the clips are re-cut.
 export const VOICE_LAST_WORD = [
   7.70, 3.87, 7.94, 5.29, 7.97, 3.46, 7.77, 2.91,
-  6.94, 4.34, 5.13, 3.92, 1.84, 4.69, 1.54, 5.15,
+  6.94, 4.34, 5.13, 3.92, 1.84, 4.69, 1.54, null,
 ];
+// The narrated lines, in the order they are numbered in voice/<lang>/.
 export const VOICE_LINES = [
   'p_bornAt', 'p_night', 'p_alone', 'p_until', 's_real', 's_storm1', 's_storm2', 's_sunrise',
   's_birthDay', 's_birthDay2', 's_birthDay3', 's_moon', 's_saturn', 's_all', 'happy', 's_after',

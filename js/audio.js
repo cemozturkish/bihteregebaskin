@@ -98,21 +98,19 @@ export function startAudio() {
 // ── recorded narration ──
 const raw = {};   // line → encoded file, as fetched
 const clips = {}; // line → decoded audio
-const starts = {}; // line → where its last word starts, in seconds into the clip
-const echoes = {}; // line → { from, end, lift }: the stretch that is echoed, and how much to lift it
+const starts = {}; // line → where its last word starts, in seconds into the clip (null: no echo)
+const echoes = {}; // line → { from, end }: the stretch that is echoed, or null for none
 function decodeVoice() {
   if (!ctx) return;
   for (const key of Object.keys(raw)) {
     const data = raw[key];
     delete raw[key];
-    ctx.decodeAudioData(data, (buf) => { clips[key] = buf; echoes[key] = lastWord(buf, starts[key]); }, () => {});
+    ctx.decodeAudioData(data, (buf) => { clips[key] = buf; echoes[key] = starts[key] === null ? null : lastWord(buf, starts[key]); }, () => {});
   }
 }
 /**
  * The last word of a clip: from `from` (or the last 0.6 s if unknown) to where
- * the speech fades out (the last 20 ms frame within 30 dB of the loudest), and
- * how much quieter it is than the line as a whole, so a softly spoken last
- * word still gets an echo you can hear (lifted at most 3x).
+ * the speech fades out (the last 20 ms frame within 30 dB of the loudest).
  */
 function lastWord(buf, from) {
   const d = buf.getChannelData(0);
@@ -129,18 +127,10 @@ function lastWord(buf, from) {
   let end = buf.duration;
   for (let k = rms.length - 1; k >= 0; k--) if (rms[k] > peak * 0.03) { end = ((k + 1) * hop) / buf.sampleRate; break; }
   if (!(from > 0 && from < end - 0.1)) from = Math.max(0, end - 0.6);
-  let all = 0, nAll = 0, word = 0, nWord = 0;
-  rms.forEach((r, k) => {
-    if (r <= peak * 0.03) return;
-    all += r * r;
-    nAll++;
-    if (k * 0.02 >= from) { word += r * r; nWord++; }
-  });
-  const lift = nWord ? Math.min(3, Math.max(1, Math.sqrt(all / nAll / (word / nWord)))) : 1;
-  return { from, end, lift };
+  return { from, end };
 }
 let voiceLevel = 0.1; // level of the narration
-const ECHO = 0.7;     // how loud the echo of the last word starts, relative to the voice
+const ECHO = 0.45;    // the first echo of the last word, relative to the word itself (quieter than it)
 let current = null;   // the gains of the line being spoken, so a level change applies at once
 /** Changes the narration level (used by the tuning page). */
 export function setVoiceLevel(v) {
@@ -155,10 +145,10 @@ export function setVoiceLevel(v) {
  * are simply skipped. `lastWord` gives, per line, where its last word starts.
  */
 export async function loadVoice(lang, ext, lines, lastWord = []) {
-  lines.forEach((key, i) => { if (lastWord[i]) starts[key] = lastWord[i]; });
+  lines.forEach((key, i) => { if (lastWord[i] !== undefined) starts[key] = lastWord[i]; });
   await Promise.all(lines.map(async (key, i) => {
     try {
-      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=15`);
+      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=16`);
       if (r.ok) raw[key] = await r.arrayBuffer();
     } catch (e) { /* no recording for this line */ }
   }));
@@ -180,17 +170,19 @@ export function speak(key) {
   src.connect(air);
   air.connect(wet);
   // only the last word goes into the echo, so it alone trails on into the pause
-  const w = echoes[key] ?? lastWord(buf);
-  const send = ctx.createGain();
-  const open = t + 0.05 + w.from;
-  const level = voiceLevel * ECHO * w.lift;
-  send.gain.setValueAtTime(0, t);
-  send.gain.setValueAtTime(0, Math.max(t, open - 0.02));
-  send.gain.linearRampToValueAtTime(level, open + 0.03);
-  send.gain.setValueAtTime(level, t + 0.05 + w.end);
-  send.gain.linearRampToValueAtTime(0, t + 0.05 + w.end + 0.3);
-  src.connect(send);
-  send.connect(echo);
+  const w = key in echoes ? echoes[key] : lastWord(buf);
+  if (w) {
+    const send = ctx.createGain();
+    const open = t + 0.05 + w.from;
+    const level = voiceLevel * ECHO;
+    send.gain.setValueAtTime(0, t);
+    send.gain.setValueAtTime(0, Math.max(t, open - 0.02));
+    send.gain.linearRampToValueAtTime(level, open + 0.03);
+    send.gain.setValueAtTime(level, t + 0.05 + w.end);
+    send.gain.linearRampToValueAtTime(0, t + 0.05 + w.end + 0.3);
+    src.connect(send);
+    send.connect(echo);
+  }
   current = { dry, air };
   // the music dips only a little, so the voice sits inside it instead of in front of it
   pad.gain.cancelScheduledValues(t);
