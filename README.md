@@ -31,7 +31,8 @@ To preview without editing anything, add parameters to the address:
 - **The Leonid meteor storm** – on 19 November 2002 the Leonids peaked over
   Europe at about 04:10 UT (06:10 in Istanbul) at well over 2,000 meteors an
   hour. Meteors on the site radiate from the true radiant in Leo and follow
-  that activity curve; the rate on screen is turned up a little for effect.
+  that activity curve. While the story tells of the storm, the rate on screen
+  is turned up far beyond the real one for effect, with the odd fireball.
 - **The skyline** – landmarks sit at their true compass bearings from the
   Galata Tower; their heights are exaggerated so they read as silhouettes.
 - **Artistic licence** – the Milky Way is painted procedurally along the real
@@ -46,6 +47,13 @@ It is a plain static site with no build step:
 python3 -m http.server 8000
 # then open http://localhost:8000
 ```
+
+## Publishing changes
+
+Browsers keep the site's files for a few minutes, so the scripts, stylesheet
+and voice clips are loaded with a version tag (`?v=12`). After changing any of
+them, raise that number everywhere it appears (search the project for `?v=`)
+so phones pick up the new files on the next reload.
 
 ## Rebuilding the star data
 

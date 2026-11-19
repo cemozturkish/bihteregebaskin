@@ -305,7 +305,7 @@ function program(gl, vs, fs) {
 }
 
 export const SKYLINE_TOP_DEG = 9;
-const MAX_METEOR_VERTS = 64 * 14 * 6;
+const MAX_METEOR_VERTS = 140 * 14 * 6; // room for 130 meteors
 
 export class Renderer {
   constructor(canvas) {
