@@ -3,6 +3,7 @@
 
 let ctx = null;
 let master = null;
+const MASTER = 1.6; // overall volume of the music and voice together
 let wet = null;
 let pad = null;
 let echo = null; // input of the echo that trails the last word of each line
@@ -33,8 +34,16 @@ export function startAudio() {
   if (!AC) return;
   ctx = new AC();
   master = ctx.createGain();
-  master.gain.value = muted ? 0 : 0.9;
-  master.connect(ctx.destination);
+  master.gain.value = muted ? 0 : MASTER;
+  // a safety limiter, so the busiest moments never crackle
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -3;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.003;
+  limiter.release.value = 0.25;
+  master.connect(limiter);
+  limiter.connect(ctx.destination);
   const verb = ctx.createConvolver();
   verb.buffer = impulse(3.2);
   wet = ctx.createGain();
@@ -148,7 +157,7 @@ export async function loadVoice(lang, ext, lines, lastWord = []) {
   lines.forEach((key, i) => { if (lastWord[i] !== undefined) starts[key] = lastWord[i]; });
   await Promise.all(lines.map(async (key, i) => {
     try {
-      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=18`);
+      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=19`);
       if (r.ok) raw[key] = await r.arrayBuffer();
     } catch (e) { /* no recording for this line */ }
   }));
@@ -204,7 +213,7 @@ export const hasVoice = () => Object.keys(clips).length + Object.keys(raw).lengt
 
 export function setMuted(m) {
   muted = m;
-  if (master) master.gain.linearRampToValueAtTime(m ? 0 : 0.9, ctx.currentTime + 0.3);
+  if (master) master.gain.linearRampToValueAtTime(m ? 0 : MASTER, ctx.currentTime + 0.3);
 }
 export const isMuted = () => muted;
 
