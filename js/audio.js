@@ -23,6 +23,11 @@ export function startAudio() {
     ctx.resume();
     return;
   }
+  // iPhones mute Web Audio while the ringer switch is on silent, unless the
+  // page says it is playing media (Safari 16.4+; ignored elsewhere).
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+  } catch (e) { /* not supported */ }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   ctx = new AC();

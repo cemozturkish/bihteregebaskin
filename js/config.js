@@ -20,7 +20,7 @@ export const CONFIG = {
   // Recorded narration. null = captions only. Once the recordings are in
   // voice/<lang>/01.m4a … 16.m4a, set e.g. { lang: 'tr', ext: 'm4a' }; the
   // site is then shown in that language so that voice and captions match.
-  voice: null,
+  voice: { lang: 'en', ext: 'm4a' },
 
   // 'auto' follows the phone's language (Turkish phone → Turkish), or force 'en' / 'tr'.
   lang: 'auto',
