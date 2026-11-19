@@ -1,6 +1,6 @@
 // Where everything in the sky was, for a given minute. All the real work is done
 // by Astronomy Engine (https://github.com/cosinekitty/astronomy, MIT).
-import { CONFIG } from './config.js?v=12';
+import { CONFIG } from './config.js?v=13';
 
 const A = window.Astronomy;
 const DEG = Math.PI / 180;

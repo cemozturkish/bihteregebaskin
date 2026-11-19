@@ -1,8 +1,8 @@
-import { CONFIG, T, LANG, VOICE_LINES } from './config.js?v=12';
-import { Renderer, MAX_METEOR_VERTS } from './renderer.js?v=12';
-import * as astro from './astro.js?v=12';
-import { paintSkyline } from './skyline.js?v=12';
-import * as audio from './audio.js?v=12';
+import { CONFIG, T, LANG, VOICE_LINES } from './config.js?v=13';
+import { Renderer, MAX_METEOR_VERTS } from './renderer.js?v=13';
+import * as astro from './astro.js?v=13';
+import { paintSkyline } from './skyline.js?v=13';
+import * as audio from './audio.js?v=13';
 
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
