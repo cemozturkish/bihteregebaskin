@@ -89,7 +89,7 @@ function decodeVoice() {
 export async function loadVoice(lang, ext, lines) {
   await Promise.all(lines.map(async (key, i) => {
     try {
-      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=12`);
+      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=13`);
       if (r.ok) raw[key] = await r.arrayBuffer();
     } catch (e) { /* no recording for this line */ }
   }));
@@ -103,16 +103,16 @@ export function speak(key) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   const dry = ctx.createGain();
-  dry.gain.value = 0.3;
+  dry.gain.value = 0.2;
   src.connect(dry);
   dry.connect(master);
   const air = ctx.createGain();
-  air.gain.value = 0.04; // reverb send, kept in proportion to the voice level
+  air.gain.value = 0.027; // reverb send, kept in proportion to the voice level
   src.connect(air);
   air.connect(wet);
-  // let the music step back while the voice is speaking
+  // the music dips only a little, so the voice sits inside it instead of in front of it
   pad.gain.cancelScheduledValues(t);
-  pad.gain.setTargetAtTime(0.045, t, 0.25);
+  pad.gain.setTargetAtTime(0.08, t, 0.25);
   pad.gain.setTargetAtTime(0.11, t + buf.duration + 0.3, 0.8);
   src.start(t + 0.05);
   speaking = src;
