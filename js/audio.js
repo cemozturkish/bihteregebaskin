@@ -98,17 +98,23 @@ export function startAudio() {
 // ── recorded narration ──
 const raw = {};   // line → encoded file, as fetched
 const clips = {}; // line → decoded audio
-const ends = {};  // line → when the speech in its clip ends, in seconds
+const starts = {}; // line → where its last word starts, in seconds into the clip
+const echoes = {}; // line → { from, end, lift }: the stretch that is echoed, and how much to lift it
 function decodeVoice() {
   if (!ctx) return;
   for (const key of Object.keys(raw)) {
     const data = raw[key];
     delete raw[key];
-    ctx.decodeAudioData(data, (buf) => { clips[key] = buf; ends[key] = speechEnd(buf); }, () => {});
+    ctx.decodeAudioData(data, (buf) => { clips[key] = buf; echoes[key] = lastWord(buf, starts[key]); }, () => {});
   }
 }
-/** Where the last word of a clip fades out: the last 20 ms frame within 30 dB of the loudest. */
-function speechEnd(buf) {
+/**
+ * The last word of a clip: from `from` (or the last 0.6 s if unknown) to where
+ * the speech fades out (the last 20 ms frame within 30 dB of the loudest), and
+ * how much quieter it is than the line as a whole, so a softly spoken last
+ * word still gets an echo you can hear (lifted at most 3x).
+ */
+function lastWord(buf, from) {
   const d = buf.getChannelData(0);
   const hop = Math.round(buf.sampleRate * 0.02);
   const rms = [];
@@ -120,16 +126,39 @@ function speechEnd(buf) {
     rms.push(r);
     if (r > peak) peak = r;
   }
-  for (let k = rms.length - 1; k >= 0; k--) if (rms[k] > peak * 0.03) return ((k + 1) * hop) / buf.sampleRate;
-  return buf.duration;
+  let end = buf.duration;
+  for (let k = rms.length - 1; k >= 0; k--) if (rms[k] > peak * 0.03) { end = ((k + 1) * hop) / buf.sampleRate; break; }
+  if (!(from > 0 && from < end - 0.1)) from = Math.max(0, end - 0.6);
+  let all = 0, nAll = 0, word = 0, nWord = 0;
+  rms.forEach((r, k) => {
+    if (r <= peak * 0.03) return;
+    all += r * r;
+    nAll++;
+    if (k * 0.02 >= from) { word += r * r; nWord++; }
+  });
+  const lift = nWord ? Math.min(3, Math.max(1, Math.sqrt(all / nAll / (word / nWord)))) : 1;
+  return { from, end, lift };
 }
-const VOICE = 0.15; // level of the narration
-const ECHO = 0.7;   // how loud the echo of the last word starts, relative to the voice
-/** Fetches voice/<lang>/01.<ext>, 02.<ext>, … for the given lines. Missing files are simply skipped. */
-export async function loadVoice(lang, ext, lines) {
+let voiceLevel = 0.1; // level of the narration
+const ECHO = 0.7;     // how loud the echo of the last word starts, relative to the voice
+let current = null;   // the gains of the line being spoken, so a level change applies at once
+/** Changes the narration level (used by the tuning page). */
+export function setVoiceLevel(v) {
+  voiceLevel = v;
+  if (current) {
+    current.dry.gain.value = v;
+    current.air.gain.value = v * 0.135;
+  }
+}
+/**
+ * Fetches voice/<lang>/01.<ext>, 02.<ext>, … for the given lines. Missing files
+ * are simply skipped. `lastWord` gives, per line, where its last word starts.
+ */
+export async function loadVoice(lang, ext, lines, lastWord = []) {
+  lines.forEach((key, i) => { if (lastWord[i]) starts[key] = lastWord[i]; });
   await Promise.all(lines.map(async (key, i) => {
     try {
-      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=14`);
+      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=15`);
       if (r.ok) raw[key] = await r.arrayBuffer();
     } catch (e) { /* no recording for this line */ }
   }));
@@ -143,24 +172,26 @@ export function speak(key) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   const dry = ctx.createGain();
-  dry.gain.value = VOICE;
+  dry.gain.value = voiceLevel;
   src.connect(dry);
   dry.connect(master);
   const air = ctx.createGain();
-  air.gain.value = VOICE * 0.135; // reverb send, kept in proportion to the voice
+  air.gain.value = voiceLevel * 0.135; // reverb send, kept in proportion to the voice
   src.connect(air);
   air.connect(wet);
-  // only the last second of speech goes into the echo, so the final word trails on
-  const end = ends[key] ?? buf.duration;
+  // only the last word goes into the echo, so it alone trails on into the pause
+  const w = echoes[key] ?? lastWord(buf);
   const send = ctx.createGain();
-  const open = t + 0.05 + Math.max(0, end - 1);
+  const open = t + 0.05 + w.from;
+  const level = voiceLevel * ECHO * w.lift;
   send.gain.setValueAtTime(0, t);
-  send.gain.setValueAtTime(0, open);
-  send.gain.linearRampToValueAtTime(VOICE * ECHO, open + 0.15);
-  send.gain.setValueAtTime(VOICE * ECHO, t + 0.05 + end);
-  send.gain.linearRampToValueAtTime(0, t + 0.05 + end + 0.3);
+  send.gain.setValueAtTime(0, Math.max(t, open - 0.02));
+  send.gain.linearRampToValueAtTime(level, open + 0.03);
+  send.gain.setValueAtTime(level, t + 0.05 + w.end);
+  send.gain.linearRampToValueAtTime(0, t + 0.05 + w.end + 0.3);
   src.connect(send);
   send.connect(echo);
+  current = { dry, air };
   // the music dips only a little, so the voice sits inside it instead of in front of it
   pad.gain.cancelScheduledValues(t);
   pad.gain.setTargetAtTime(0.08, t, 0.25);
