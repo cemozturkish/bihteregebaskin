@@ -5,6 +5,7 @@ let ctx = null;
 let master = null;
 let wet = null;
 let pad = null;
+let echo = null; // input of the echo that trails the last word of each line
 let muted = false;
 
 function impulse(seconds) {
@@ -40,6 +41,26 @@ export function startAudio() {
   wet.gain.value = 0.55;
   wet.connect(verb);
   verb.connect(master);
+
+  // echo for the end of each spoken line: repeats every 0.4 s, each one
+  // quieter and a little darker, dying away over two or three seconds
+  echo = ctx.createGain();
+  const delay = ctx.createDelay(1);
+  delay.delayTime.value = 0.4;
+  const tone = ctx.createBiquadFilter();
+  tone.type = 'lowpass';
+  tone.frequency.value = 2600;
+  const feedback = ctx.createGain();
+  feedback.gain.value = 0.55;
+  const echoVerb = ctx.createGain();
+  echoVerb.gain.value = 0.15;
+  echo.connect(delay);
+  delay.connect(tone);
+  tone.connect(feedback);
+  feedback.connect(delay);
+  tone.connect(master);
+  tone.connect(echoVerb);
+  echoVerb.connect(wet);
 
   // pad: an open D chord, slowly breathing
   pad = ctx.createGain();
@@ -77,19 +98,38 @@ export function startAudio() {
 // ── recorded narration ──
 const raw = {};   // line → encoded file, as fetched
 const clips = {}; // line → decoded audio
+const ends = {};  // line → when the speech in its clip ends, in seconds
 function decodeVoice() {
   if (!ctx) return;
   for (const key of Object.keys(raw)) {
     const data = raw[key];
     delete raw[key];
-    ctx.decodeAudioData(data, (buf) => { clips[key] = buf; }, () => {});
+    ctx.decodeAudioData(data, (buf) => { clips[key] = buf; ends[key] = speechEnd(buf); }, () => {});
   }
 }
+/** Where the last word of a clip fades out: the last 20 ms frame within 30 dB of the loudest. */
+function speechEnd(buf) {
+  const d = buf.getChannelData(0);
+  const hop = Math.round(buf.sampleRate * 0.02);
+  const rms = [];
+  let peak = 0;
+  for (let i = 0; i + hop <= d.length; i += hop) {
+    let sum = 0;
+    for (let j = i; j < i + hop; j++) sum += d[j] * d[j];
+    const r = Math.sqrt(sum / hop);
+    rms.push(r);
+    if (r > peak) peak = r;
+  }
+  for (let k = rms.length - 1; k >= 0; k--) if (rms[k] > peak * 0.03) return ((k + 1) * hop) / buf.sampleRate;
+  return buf.duration;
+}
+const VOICE = 0.15; // level of the narration
+const ECHO = 0.7;   // how loud the echo of the last word starts, relative to the voice
 /** Fetches voice/<lang>/01.<ext>, 02.<ext>, … for the given lines. Missing files are simply skipped. */
 export async function loadVoice(lang, ext, lines) {
   await Promise.all(lines.map(async (key, i) => {
     try {
-      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=13`);
+      const r = await fetch(`voice/${lang}/${String(i + 1).padStart(2, '0')}.${ext}?v=14`);
       if (r.ok) raw[key] = await r.arrayBuffer();
     } catch (e) { /* no recording for this line */ }
   }));
@@ -103,13 +143,24 @@ export function speak(key) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   const dry = ctx.createGain();
-  dry.gain.value = 0.2;
+  dry.gain.value = VOICE;
   src.connect(dry);
   dry.connect(master);
   const air = ctx.createGain();
-  air.gain.value = 0.027; // reverb send, kept in proportion to the voice level
+  air.gain.value = VOICE * 0.135; // reverb send, kept in proportion to the voice
   src.connect(air);
   air.connect(wet);
+  // only the last second of speech goes into the echo, so the final word trails on
+  const end = ends[key] ?? buf.duration;
+  const send = ctx.createGain();
+  const open = t + 0.05 + Math.max(0, end - 1);
+  send.gain.setValueAtTime(0, t);
+  send.gain.setValueAtTime(0, open);
+  send.gain.linearRampToValueAtTime(VOICE * ECHO, open + 0.15);
+  send.gain.setValueAtTime(VOICE * ECHO, t + 0.05 + end);
+  send.gain.linearRampToValueAtTime(0, t + 0.05 + end + 0.3);
+  src.connect(send);
+  send.connect(echo);
   // the music dips only a little, so the voice sits inside it instead of in front of it
   pad.gain.cancelScheduledValues(t);
   pad.gain.setTargetAtTime(0.08, t, 0.25);
