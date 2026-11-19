@@ -103,11 +103,11 @@ export function speak(key) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   const dry = ctx.createGain();
-  dry.gain.value = 1;
+  dry.gain.value = 0.6;
   src.connect(dry);
   dry.connect(master);
   const air = ctx.createGain();
-  air.gain.value = 0.07;
+  air.gain.value = 0.08; // reverb send: about 6 dB more reverb relative to the voice than before
   src.connect(air);
   air.connect(wet);
   // let the music step back while the voice is speaking
