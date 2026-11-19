@@ -1,8 +1,8 @@
-import { CONFIG, T, LANG, VOICE_LINES } from './config.js?v=14';
-import { Renderer, MAX_METEOR_VERTS } from './renderer.js?v=14';
-import * as astro from './astro.js?v=14';
-import { paintSkyline } from './skyline.js?v=14';
-import * as audio from './audio.js?v=14';
+import { CONFIG, T, LANG, VOICE_LINES, VOICE_LAST_WORD } from './config.js?v=16';
+import { Renderer, MAX_METEOR_VERTS } from './renderer.js?v=16';
+import * as astro from './astro.js?v=16';
+import { paintSkyline } from './skyline.js?v=16';
+import * as audio from './audio.js?v=16';
 
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
@@ -1161,7 +1161,7 @@ async function boot() {
   }));
   renderer.setSkyline(paintSkyline());
   buildTicks();
-  if (CONFIG.voice) audio.loadVoice(CONFIG.voice.lang, CONFIG.voice.ext, VOICE_LINES);
+  if (CONFIG.voice) audio.loadVoice(CONFIG.voice.lang, CONFIG.voice.ext, VOICE_LINES, CONFIG.voice.lang === 'en' ? VOICE_LAST_WORD : []);
 
   sky = astro.skyAt(astro.fromMinutes(S.minutes));
   resize();
