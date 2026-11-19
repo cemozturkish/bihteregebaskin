@@ -759,6 +759,7 @@ function hideCard() {
 // ── captions ───────────────────────────────────────────────────────────────
 let captionTimer = 0;
 let voiceUntil = 0; // when the line being spoken ends
+const VOICE_GAP = 1800; // ms of quiet after each recorded line before the story moves on
 function stopVoice() {
   audio.stopVoice();
   voiceUntil = 0;
@@ -767,7 +768,7 @@ function say(text, ms, cls = '', line = null) {
   // with a recording, the caption stays up for as long as the voice needs
   const spoken = line ? audio.speak(line) * 1000 : 0;
   if (spoken) {
-    voiceUntil = performance.now() + spoken + 450;
+    voiceUntil = performance.now() + spoken + VOICE_GAP;
     ms = Math.max(ms, spoken + 300);
   }
   clearTimeout(captionTimer);
@@ -1004,7 +1005,7 @@ async function finale(t) {
   const tune = audio.happyBirthday(0.52) * 1000;
   document.title = CONFIG.name ? `${T.happy}, ${CONFIG.name} ✦` : `${T.happy} ✦`;
   await sleep(5400, t);
-  voiceUntil = performance.now() + audio.speak('happy') * 1000;
+  voiceUntil = performance.now() + audio.speak('happy') * 1000 + VOICE_GAP;
   await sleep(800, t);
   say(FROM ? `${T.s_after}\n${T.p_too(FROM.name)}` : T.s_after, Math.max(tune - 4500, 6000), 'small', 's_after');
   await sleep(Math.max(tune - 5200, 7000) + 3500, t);
